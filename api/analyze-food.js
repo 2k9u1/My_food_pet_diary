@@ -5,7 +5,7 @@
 // 절대 포함되지 않고, 이 서버 함수 안에서만 사용됩니다. 발급: https://aistudio.google.com/apikey
 // (구글 계정만 있으면 카드 등록 없이 무료로 키를 받을 수 있습니다.)
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 
 const PROMPT = `이 사진은 초등학생이 자기 식사를 스스로 점검하려고 올린 사진입니다.
 사진 속 음식을 보고 아래 JSON 형식으로만 답하세요. 다른 설명은 절대 덧붙이지 마세요.
