@@ -65,7 +65,11 @@ export default async function handler(req, res) {
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error("Gemini API error:", geminiRes.status, errText);
-      res.status(502).json({ error: "AI 분석 서버에 문제가 있어요. 잠시 후 다시 시도해 주세요." });
+      res.status(502).json({
+        error: "AI 분석 서버에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
+        debugStatus: geminiRes.status,
+        debugBody: errText.slice(0, 500),
+      });
       return;
     }
 
@@ -85,6 +89,6 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("analyze-food failed:", err);
-    res.status(500).json({ error: "사진 분석 중 문제가 생겼어요." });
+    res.status(500).json({ error: "사진 분석 중 문제가 생겼어요.", debugMessage: String(err?.message ?? err) });
   }
 }
