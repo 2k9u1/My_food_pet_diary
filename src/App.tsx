@@ -9,6 +9,7 @@ import { TeacherApp } from "./features/teacher/TeacherApp";
 export default function App() {
   const [session, setSession] = useState<SessionState>({ status: "signedOut" });
   const [ready, setReady] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const refreshSession = useCallback(async () => {
     setSession(await getSessionState());
@@ -44,9 +45,26 @@ export default function App() {
           <span className={`role-pill ${user.role}`}>{user.role === "student" ? "학생" : "교사"}</span>
           <span>{user.displayName}</span>
           {user.role === "teacher" && user.classCode && (
-            <span className="meta-chip" title="학생들에게 이 코드를 알려주면 우리 반으로 가입해요">
-              학급 코드 <b className="mono">{user.classCode}</b>
-            </span>
+            <>
+              <span className="meta-chip" title="학생들에게 이 코드를 알려주면 우리 반으로 가입해요">
+                학급 코드 <b className="mono">{user.classCode}</b>
+              </span>
+              <button
+                className="btn btn-ghost"
+                onClick={async () => {
+                  const url = `${window.location.origin}/?code=${user.classCode}`;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                  } catch {
+                    // 클립보드 권한이 없으면 조용히 무시 — 코드는 옆에 그대로 보임
+                  }
+                  setLinkCopied(true);
+                  setTimeout(() => setLinkCopied(false), 2000);
+                }}
+              >
+                {linkCopied ? "복사됨! ✓" : "학생용 링크 복사"}
+              </button>
+            </>
           )}
           <button
             className="btn btn-ghost"
