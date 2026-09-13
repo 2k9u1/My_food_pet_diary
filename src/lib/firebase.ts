@@ -6,7 +6,7 @@
 // 로그인은 Firebase Auth, 저장은 Firestore만 사용합니다.
 
 import { initializeApp, type FirebaseOptions } from "firebase/app";
-import { GoogleAuthProvider, getAuth } from "firebase/auth";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig: FirebaseOptions = {
@@ -23,4 +23,3 @@ const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 
 export const firebaseAuth = app ? getAuth(app) : null;
 export const firestore = app ? getFirestore(app) : null;
-export const googleProvider = new GoogleAuthProvider();

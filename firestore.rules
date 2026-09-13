@@ -8,22 +8,21 @@ rules_version = '2';
 // 적용 방법: Firebase 콘솔 > Firestore Database > 규칙 탭에 이 파일 내용을
 // 그대로 붙여넣고 "게시"를 누르세요. (또는 Firebase CLI: firebase deploy --only firestore:rules)
 //
-// 중요: 아래 TEACHER_EMAILS 목록은 src/lib/teacherEmails.ts 와 반드시 똑같이
-// 맞춰주세요. 한쪽만 고치면 화면에 보이는 역할과 실제 서버 권한이 어긋납니다.
+// 역할(학생/교사)은 로그인 화면에서 본인이 직접 고르고, 그 값이 그대로
+// users/{uid}.role에 저장됩니다(이메일로 검증하지 않음 — README 참고).
+// isTeacher()는 "내 uid로 등록된 내 프로필의 role이 teacher인지"를 봅니다.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function teacherEmails() {
-      return [
-        'padsa15@gmail.com' // src/lib/teacherEmails.ts 의 TEACHER_EMAILS와 동일하게 유지
-      ];
-    }
-
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isTeacher() {
-      return isSignedIn() && request.auth.token.email.lower() in teacherEmails();
+      return isSignedIn() && myProfile().role == 'teacher';
     }
 
     function isOwner(uid) {
@@ -43,12 +42,10 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isOwner(uid) || isMyStudentDoc();
-      // 생성 시점에만 role을 정할 수 있고, teacher로는 teacherEmails()에 있는
-      // 사람만 자기 문서를 만들 수 있습니다 — 학생이 임의로 교사 행세를 못 합니다.
-      allow create: if isOwner(uid) &&
-        ((request.resource.data.role == 'teacher' && isTeacher()) ||
-         (request.resource.data.role == 'student' && !isTeacher()));
-      // 이후 수정은 본인만, role은 바꿀 수 없습니다.
+      // 역할은 본인이 정합니다(가입 화면에서 선택). role 값이 student/teacher
+      // 둘 중 하나인지만 확인하고, 그 이상의 신원 검증은 하지 않습니다.
+      allow create: if isOwner(uid) && request.resource.data.role in ['teacher', 'student'];
+      // 이후 수정은 본인만, role은 만든 뒤에 바꿀 수 없습니다.
       allow update: if isOwner(uid) && request.resource.data.role == resource.data.role;
       allow delete: if false;
 
@@ -71,20 +68,19 @@ service cloud.firestore {
       // 미션 규칙 · 오늘의 미션 후보 목록: 그 교사(uid) 본인과, teacherId가 uid인
       // 학생만 읽을 수 있고, 고치는 것은 교사 본인만 할 수 있습니다.
       match /missionSettings/{docId} {
-        allow read: if isOwner(uid) ||
-          (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teacherId == uid);
+        allow read: if isOwner(uid) || (isSignedIn() && myProfile().teacherId == uid);
         allow write: if isOwner(uid) && isTeacher();
       }
 
       match /specialMissions/{docId} {
-        allow read: if isOwner(uid) ||
-          (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teacherId == uid);
+        allow read: if isOwner(uid) || (isSignedIn() && myProfile().teacherId == uid);
         allow write: if isOwner(uid) && isTeacher();
       }
     }
 
     // 학급 코드 -> 교사 uid. 학생이 가입할 때 코드를 조회해야 하므로 로그인한
-    // 사람 누구나 읽을 수 있고, 교사 본인만 자기 코드를 등록할 수 있습니다.
+    // 사람 누구나 읽을 수 있고, 자기 프로필을 teacher로 먼저 만든 사람만 자기
+    // 코드를 등록할 수 있습니다(그래서 앱은 프로필을 먼저 만들고 코드를 나중에 등록합니다).
     match /classCodes/{code} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isTeacher() && request.resource.data.teacherId == request.auth.uid;

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ensureSeedData } from "./lib/store";
-import { completeGoogleOnboarding, getSessionState, logout, subscribeAuthChanges, type SessionState } from "./lib/auth";
+import { getSessionState, logout, subscribeAuthChanges, type SessionState } from "./lib/auth";
 import { LoginScreen } from "./components/LoginScreen";
-import { GoogleOnboardingForm } from "./components/GoogleOnboardingForm";
 import { Footer } from "./components/Footer";
 import { StudentApp } from "./features/student/StudentApp";
 import { TeacherApp } from "./features/teacher/TeacherApp";
@@ -22,46 +21,12 @@ export default function App() {
     });
   }, [refreshSession]);
 
-  // 교사로 인식된 계정은 별도 입력 화면 없이 자동으로 프로필을 만듭니다.
-  useEffect(() => {
-    if (session.status === "needsOnboarding" && session.suggestedRole === "teacher") {
-      completeGoogleOnboarding({
-        uid: session.uid,
-        displayName: session.googleName || "교사",
-        role: "teacher",
-      }).then(refreshSession);
-    }
-  }, [session, refreshSession]);
-
   if (!ready) return null;
 
   if (session.status === "signedOut") {
     return (
       <div className="app-shell">
         <LoginScreen onLogin={(user) => setSession({ status: "ready", user })} />
-        <Footer />
-      </div>
-    );
-  }
-
-  if (session.status === "needsOnboarding") {
-    if (session.suggestedRole === "teacher") {
-      return (
-        <div className="login-wrap">
-          <p className="page-sub">교사 계정을 확인하는 중...</p>
-        </div>
-      ); // 자동 등록 처리 중
-    }
-
-    return (
-      <div className="app-shell">
-        <GoogleOnboardingForm
-          googleName={session.googleName}
-          onSubmit={async (input) => {
-            await completeGoogleOnboarding({ uid: session.uid, ...input, role: "student" });
-            await refreshSession();
-          }}
-        />
         <Footer />
       </div>
     );
