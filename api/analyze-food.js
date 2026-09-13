@@ -88,6 +88,8 @@ export default async function handler(req, res) {
           geminiRes.status === 429
             ? "지금 사진 분석 요청이 많아서 잠시 기다려야 해요. 30초 후 다시 시도해 주세요."
             : "AI 분석 서버에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
+        debugStatus: geminiRes.status,
+        debugBody: lastErrText.slice(0, 500),
       });
       return;
     }
