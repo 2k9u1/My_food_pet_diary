@@ -45,27 +45,47 @@ export default async function handler(req, res) {
   }
   const [, mimeType, base64Data] = match;
 
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: base64Data } }],
-            },
-          ],
-          generationConfig: { responseMimeType: "application/json" },
-        }),
-      }
-    );
+    let geminiRes;
+    let lastErrText = "";
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: base64Data } }],
+              },
+            ],
+            generationConfig: { responseMimeType: "application/json" },
+          }),
+        }
+      );
+
+      if (geminiRes.ok) break;
+
+      lastErrText = await geminiRes.text();
+      console.error(`Gemini API error (attempt ${attempt}/${maxAttempts}):`, geminiRes.status, lastErrText);
+
+      // 429(요청 과다)·503(일시적 과부하)는 잠깐 쉬었다가 다시 시도해볼 가치가 있음
+      const retryable = geminiRes.status === 429 || geminiRes.status === 503;
+      if (!retryable || attempt === maxAttempts) break;
+      await sleep(attempt * 800);
+    }
 
     if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini API error:", geminiRes.status, errText);
-      res.status(502).json({ error: "AI 분석 서버에 문제가 있어요. 잠시 후 다시 시도해 주세요." });
+      res.status(502).json({
+        error:
+          geminiRes.status === 429
+            ? "지금 사진 분석 요청이 많아서 잠시 기다려야 해요. 30초 후 다시 시도해 주세요."
+            : "AI 분석 서버에 문제가 있어요. 잠시 후 다시 시도해 주세요.",
+      });
       return;
     }
 
