@@ -35,8 +35,8 @@ export function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
     role === "teacher"
       ? name.trim().length > 0 && (!usingFirebase || (email.trim().length > 0 && password.length >= 6))
       : name.trim().length > 0 &&
-        studentNumber.trim().length > 0 &&
-        (!usingFirebase || (classCode.trim().length > 0 && password.length >= 6));
+      studentNumber.trim().length > 0 &&
+      (!usingFirebase || (classCode.trim().length > 0 && password.length >= 6));
 
   async function handleSubmit() {
     if (!canSubmit || busy) return;
@@ -50,12 +50,12 @@ export function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
             : await signInLocalTeacher({ displayName: name.trim() })
           : usingFirebase
             ? await signInOrUpStudent({
-                displayName: name.trim(),
-                studentNumber: studentNumber.trim(),
-                useAlias,
-                classCode: classCode.trim(),
-                password,
-              })
+              displayName: name.trim(),
+              studentNumber: studentNumber.trim(),
+              useAlias,
+              classCode: classCode.trim(),
+              password,
+            })
             : await signInLocalStudent({ displayName: name.trim(), studentNumber: studentNumber.trim(), useAlias });
       onLogin(user);
     } catch (err) {
@@ -69,7 +69,7 @@ export function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
     <div className="login-wrap">
       <div className="card login-card stack" style={{ gap: 12 }}>
         <div>
-          <p className="page-title">🐾 밥친구</p>
+          <p className="page-title">🐾마이푸드펫다이어리</p>
           <p className="page-sub">식단을 인증하고 내 펫을 키워보세요.</p>
         </div>
 
