@@ -29,15 +29,18 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // 이 학생 문서(users/{uid})가 "나"(로그인한 교사)의 학급 학생인지
+    // 이 학생 문서(users/{uid})가 "나"(로그인한 교사)의 학급 학생인지.
+    // resource(그 문서 자신)의 teacherId만 보고 판단합니다 — users 컬렉션을
+    // 조회(list)하는 도중에 내 프로필을 또 get()으로 읽으면 Firestore가
+    // 그 목록 조회 자체를 거부하는 경우가 있어서, 추가 조회 없이 판단합니다.
     function isMyStudentDoc() {
-      return isTeacher() && resource.data.teacherId == request.auth.uid;
+      return isSignedIn() && resource.data.teacherId == request.auth.uid;
     }
 
     // petState/dailyProgress/submissions 문서에 함께 저장해 둔 teacherId로,
     // 추가 조회 없이 "내 학급 학생의 데이터인지"를 확인합니다.
     function isMyStudentData() {
-      return isTeacher() && resource.data.teacherId == request.auth.uid;
+      return isSignedIn() && resource.data.teacherId == request.auth.uid;
     }
 
     match /users/{uid} {

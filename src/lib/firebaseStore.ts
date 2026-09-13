@@ -353,13 +353,25 @@ export async function submitMeal(input: {
 // ---------- 교사 대시보드 집계 ----------
 
 export async function listAllStudentsSummary(teacherId: string): Promise<StudentSummary[]> {
-  const students = await listStudents(teacherId);
+  const students = await listStudents(teacherId).catch((e) => {
+    console.error("[DEBUG listStudents]", e);
+    throw e;
+  });
   const today = todayStr();
   const results: StudentSummary[] = [];
   for (const user of students) {
-    const petState = await getPetState(user.id, teacherId);
-    const todayProgress = await getDailyProgress(user.id, teacherId, today);
-    const history = await listDailyProgress(user.id);
+    const petState = await getPetState(user.id, teacherId).catch((e) => {
+      console.error("[DEBUG getPetState]", user.id, e);
+      throw e;
+    });
+    const todayProgress = await getDailyProgress(user.id, teacherId, today).catch((e) => {
+      console.error("[DEBUG getDailyProgress]", user.id, e);
+      throw e;
+    });
+    const history = await listDailyProgress(user.id).catch((e) => {
+      console.error("[DEBUG listDailyProgress]", user.id, e);
+      throw e;
+    });
     let attempted = 0;
     let succeeded = 0;
     for (const day of history) {
@@ -370,7 +382,10 @@ export async function listAllStudentsSummary(teacherId: string): Promise<Student
         }
       }
     }
-    const submissions = await listSubmissions(user.id);
+    const submissions = await listSubmissions(user.id).catch((e) => {
+      console.error("[DEBUG listSubmissions]", user.id, e);
+      throw e;
+    });
     results.push({
       user,
       petState,
