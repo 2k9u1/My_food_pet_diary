@@ -15,6 +15,18 @@ export function validateImageFile(file: File): void {
   }
 }
 
+/** 이미지 소스(사진 파일이든 카메라 프레임이든)를 정해진 크기로 줄여 JPEG dataURL로 만듭니다. */
+function drawScaledToDataUrl(source: CanvasImageSource, srcWidth: number, srcHeight: number): string {
+  const scale = Math.min(1, MAX_WIDTH / srcWidth);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(srcWidth * scale));
+  canvas.height = Math.max(1, Math.round(srcHeight * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new UploadError("사진을 처리하지 못했어요. 다시 시도해 주세요.");
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.72);
+}
+
 export async function fileToCompressedDataUrl(file: File): Promise<string> {
   validateImageFile(file);
 
@@ -32,12 +44,10 @@ export async function fileToCompressedDataUrl(file: File): Promise<string> {
     el.src = rawDataUrl;
   });
 
-  const scale = Math.min(1, MAX_WIDTH / img.width);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(img.width * scale));
-  canvas.height = Math.max(1, Math.round(img.height * scale));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return rawDataUrl;
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.72);
+  return drawScaledToDataUrl(img, img.width, img.height);
+}
+
+/** 웹캠 <video>의 현재 화면을 캡처해 같은 방식으로 압축한 dataURL로 만듭니다. */
+export function captureVideoFrameToDataUrl(video: HTMLVideoElement): string {
+  return drawScaledToDataUrl(video, video.videoWidth, video.videoHeight);
 }

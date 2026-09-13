@@ -1,13 +1,16 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import type { MealType, Phase, SubmitResult } from "../../types";
+import type { MealType, Phase, SourceType, SubmitResult } from "../../types";
 import { MEAL_EMOJI, MEAL_LABEL, MEAL_ORDER } from "../../lib/labels";
 import { fileToCompressedDataUrl, UploadError } from "../../lib/image";
 import { submitMeal } from "../../lib/store";
+import { CameraCapture } from "./CameraCapture";
 
 const PHASES: Array<{ value: Phase; label: string; emoji: string }> = [
   { value: "before", label: "식사 전", emoji: "🍽️" },
   { value: "after", label: "식사 후", emoji: "✅" },
 ];
+
+type PhotoStep = "choose" | "camera";
 
 export function SubmitFlow({
   studentId,
@@ -23,7 +26,8 @@ export function SubmitFlow({
   const [mealType, setMealType] = useState<MealType | null>(null);
   const [phase, setPhase] = useState<Phase | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [sourceType, setSourceType] = useState<"camera" | "gallery" | "unknown">("unknown");
+  const [sourceType, setSourceType] = useState<SourceType>("unknown");
+  const [photoStep, setPhotoStep] = useState<PhotoStep>("choose");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -35,10 +39,23 @@ export function SubmitFlow({
     try {
       const dataUrl = await fileToCompressedDataUrl(file);
       setPreview(dataUrl);
+      setSourceType("unknown"); // 파일 선택창에서는 촬영/사진첩 중 뭘 골랐는지 구분할 수 없음
     } catch (err) {
       setPreview(null);
       setError(err instanceof UploadError ? err.message : "사진 처리 중 문제가 생겼어요.");
     }
+  }
+
+  function handleCameraCapture(dataUrl: string) {
+    setPreview(dataUrl);
+    setSourceType("camera");
+    setPhotoStep("choose");
+    setError("");
+  }
+
+  function resetPhoto() {
+    setPreview(null);
+    setPhotoStep("choose");
   }
 
   const canSubmit = mealType && phase && preview && !busy;
@@ -98,32 +115,34 @@ export function SubmitFlow({
 
         <div>
           <label style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-dim)" }}>③ 사진을 올려주세요</label>
-          <div className={`upload-box ${preview ? "has-image" : ""}`} style={{ marginTop: 8 }}>
-            {preview ? (
-              <img src={preview} alt="업로드한 사진 미리보기" />
-            ) : (
-              <>
-                <div style={{ fontSize: 30 }}>📷</div>
-                지금 촬영하거나, 사진첩에서 골라도 돼요
-              </>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                handleFile(e);
-                setSourceType("unknown");
-              }}
-            />
-          </div>
-          {preview && (
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button className="btn" onClick={() => fileRef.current?.click()}>
+
+          {photoStep === "camera" ? (
+            <div style={{ marginTop: 8 }}>
+              <CameraCapture onCapture={handleCameraCapture} onCancel={() => setPhotoStep("choose")} />
+            </div>
+          ) : preview ? (
+            <div style={{ marginTop: 8 }}>
+              <div className="upload-box has-image">
+                <img src={preview} alt="업로드한 사진 미리보기" />
+              </div>
+              <button className="btn" style={{ marginTop: 8 }} onClick={resetPhoto}>
                 다른 사진으로 바꾸기
               </button>
             </div>
+          ) : (
+            <div className="choice-row two" style={{ marginTop: 8 }}>
+              <button className="choice-btn" onClick={() => setPhotoStep("camera")}>
+                <span className="emoji">📷</span>
+                지금 촬영하기
+              </button>
+              <button className="choice-btn" onClick={() => fileRef.current?.click()}>
+                <span className="emoji">🖼️</span>
+                사진첩에서 선택
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+            </div>
           )}
+
           <p className="hint">오늘 먹은 식사 사진을 올려주세요. 판정 결과는 미션 수행을 돕기 위한 참고이며, 사진을 잘못 인식할 수 있어요.</p>
         </div>
 
