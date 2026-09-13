@@ -13,7 +13,8 @@
 | | 설정 없음 (기본) | `.env.local`에 Firebase 설정 있음 |
 |---|---|---|
 | 로그인 | 이름/학번만 입력하는 간편 로그인 | 실제 **Google 로그인** |
-| 저장 | 이 브라우저의 `localStorage`만 (혼자 테스트용) | **Firestore + Storage** (여러 학생·기기가 함께 씀) |
+| 저장 | 이 브라우저의 `localStorage`만 (혼자 테스트용) | **Firestore** (여러 학생·기기가 함께 씀) |
+| 사진 판정 | 사진 데이터로 만든 임시 시뮬레이션 점수 | **Google Gemini**가 사진을 보고 실제로 판정 (사진은 저장하지 않음) |
 | 용도 | 화면/기능을 빠르게 체험 | 실제 학급 운영 |
 
 ## 실행 방법
@@ -31,11 +32,14 @@ npm run dev
 npm run build
 ```
 
+## 사진은 저장하지 않습니다
+
+학생이 올린 식사 사진은 **AI 분석 요청 한 번에만 잠깐 쓰이고 어디에도 저장되지 않습니다.** Firestore에는 AI가 사진을 보고 남긴 짧은 설명(예: "밥, 김치찌개, 계란말이")과 판정 점수만 남습니다. 사진 파일을 위한 별도 저장소(Firebase Storage 등)를 아예 쓰지 않는 구조라서, 유료 요금제(Blaze) 등록 없이 무료로 운영할 수 있습니다.
+
 ## 아직 대체된 부분
 
-- **AI 판정**: 실제 이미지 인식 대신, 사진 데이터로 만든 임시 점수로 판정합니다(`src/lib/judge.ts`의 `scoreImage` 함수). 실제 채소/단백질/잔반 인식 AI로 바꿔 끼우는 자리를 미리 마련해 두었습니다.
-- **오늘의 미션 인증**: 사진 판정이 아니라 학생이 스스로 "실천했어요"를 눌러 인증하는 자기 점검형입니다(의도된 설계입니다. README "지금 버전이 할 수 있는 것" 참고).
-- **간편 로그인(데모) 모드의 다중 교사**: 데모 모드는 브라우저 하나당 교사 계정이 하나뿐이라고 가정합니다(학급 코드 입력 화면 없음). 여러 교사가 각자 학급을 운영하는 진짜 다중 교사 구조는 Google 로그인 모드(Firebase)에서만 동작합니다.
+- **오늘의 미션 인증**: 사진 판정이 아니라 학생이 스스로 "실천했어요"를 눌러 인증하는 자기 점검형입니다(의도된 설계입니다).
+- **간편 로그인(데모) 모드**: 브라우저 하나당 교사 계정이 하나뿐이라고 가정하고(학급 코드 입력 화면 없음), 사진 판정도 AI 호출 없이 임시 시뮬레이션 점수를 씁니다. 진짜 다중 교사 + 실제 AI 판정은 Google 로그인 모드(Firebase + Vercel 배포)에서만 동작합니다.
 
 ## 폴더 구조
 
@@ -48,56 +52,65 @@ src/
     teacherEmails.ts         교사로 인식할 구글 이메일 목록 (firestore.rules와 짝을 이룸)
     id.ts                    학급 코드 생성(generateClassCode) 등 공용 유틸
     store.ts                데이터 파사드 — firebaseStore.ts / localStore.ts 중 하나를 자동 선택
-    localStore.ts            localStorage 기반 구현 (데모 모드)
-    firebaseStore.ts         Firestore/Storage 기반 구현 (실제 서비스 모드)
-    judge.ts                판정 로직(세 끼 판정, 잔반 제로 판정, 고난도 보너스) — AI 연동 지점 포함
+    localStore.ts            localStorage 기반 구현 (데모 모드, 사진 판정은 임시 시뮬레이션)
+    firebaseStore.ts         Firestore 기반 구현 (실제 서비스 모드, 사진 판정은 Gemini 실제 분석)
+    aiVision.ts              /api/analyze-food 호출 클라이언트 헬퍼 (실제 서비스 모드 전용)
+    judge.ts                판정 로직(세 끼 판정, 잔반 제로 판정, 고난도 보너스) — 점수만 받아 판정
     dailyMission.ts          오늘의 미션을 날짜 기준으로 결정론적으로 뽑는 함수
     pet.ts                   경험치 → 레벨 → 성장 단계 계산 (결정론적)
-    image.ts                사진 업로드 검증/압축
+    image.ts                사진 업로드 검증/압축(서버로 보내기 전 크기 줄이기)
     seed.ts / labels.ts / id.ts   기본값, 화면 라벨, 공용 유틸
   components/
     LoginScreen.tsx         로그인 화면 (모드에 따라 Google 버튼 또는 간편 로그인 폼)
-    GoogleOnboardingForm.tsx Google 로그인 후 처음 한 번만 나오는 학번 입력 화면
+    GoogleOnboardingForm.tsx Google 로그인 후 처음 한 번만 나오는 학급코드/학번 입력 화면
     Footer.tsx / PolicyModal.tsx   개인정보 처리방침·이용약관 초안, 푸터
   features/
     student/                 학생 화면(오늘 요약, 인증 입력, 결과 화면)
     teacher/                  교사 화면(학생 현황, 규칙 설정, 오늘의 미션 관리, 학생 상세)
   App.tsx                    로그인 상태에 따라 화면을 연결
+api/
+  analyze-food.js            Vercel 서버리스 함수 — 사진을 Google Gemini로 분석(사진은 저장 안 함)
 docs/
   requirements.html          전체 요구사항 정의서
-firestore.rules              Firestore 보안 규칙 (Firebase 콘솔에 붙여넣기)
-storage.rules                Storage 보안 규칙 (Firebase 콘솔에 붙여넣기)
+firestore.rules              Firestore 보안 규칙 (Firebase 콘솔에 붙여넣기 또는 CLI로 배포)
 ```
 
-화면(UI) · 판정 로직 · 데이터 저장이 파일별로 분리되어 있어서, 한 부분을 바꿔도 다른 부분에 영향이 적습니다. 예를 들어 실제 AI 인식을 붙일 때는 `src/lib/judge.ts`의 `scoreImage` 함수만 바꾸면 됩니다.
+화면(UI) · 판정 로직 · 데이터 저장이 파일별로 분리되어 있어서, 한 부분을 바꿔도 다른 부분에 영향이 적습니다. 예를 들어 AI 분석 방식을 바꾸고 싶다면 `api/analyze-food.js`(어떤 AI를 부를지)와 `src/lib/aiVision.ts`(어떻게 호출할지)만 고치면 되고, 세 끼/잔반 판정 기준 자체는 `src/lib/judge.ts`에서 점수만 받아 계산하므로 그대로 둡니다.
 
 ## 실제 서비스로 켜기 (Google 로그인 + 공용 저장)
 
 아래는 개발자가 아니어도 따라 할 수 있는 순서입니다. 처음 한 번만 하면 됩니다.
 
-### 1. Firebase 프로젝트 만들기
+### 1. Firebase 프로젝트 만들기 (로그인 + 데이터 저장용)
 
 1. [Firebase 콘솔](https://console.firebase.google.com)에 구글 계정으로 로그인 → "프로젝트 추가" → 이름 입력(예: 밥친구) → 만들기.
 2. 왼쪽 메뉴 **Authentication** → "시작하기" → 로그인 방법 탭에서 **Google** 사용 설정.
 3. 왼쪽 메뉴 **Firestore Database** → "데이터베이스 만들기" → (지역은 `asia-northeast3`(서울) 추천) → 우선 "테스트 모드"로 시작해도 되지만, 아래 3단계에서 규칙을 반드시 우리 파일로 교체하세요.
-4. 왼쪽 메뉴 **Storage** → "시작하기" → 기본값으로 만들기.
-5. 프로젝트 설정(⚙️ 아이콘) → "내 앱" → 웹 아이콘(`</>`) 클릭 → 앱 등록 → 화면에 나오는 `firebaseConfig` 값을 복사해 둡니다.
+4. 프로젝트 설정(⚙️ 아이콘) → "내 앱" → 웹 아이콘(`</>`) 클릭 → 앱 등록 → 화면에 나오는 `firebaseConfig` 값을 복사해 둡니다.
 
-### 2. 이 프로젝트에 연결하기
+   Storage(사진 저장소)는 만들지 않아도 됩니다 — 이 프로젝트는 사진을 저장하지 않고, 대신 AI가 그 자리에서 분석만 하고 결과만 남깁니다(아래 2번 참고). Firebase Storage는 현재 유료(Blaze) 요금제 등록이 있어야 새로 만들 수 있어서 일부러 쓰지 않았습니다.
 
-1. 프로젝트 루트의 `.env.example` 파일을 복사해서 `.env.local`이라는 이름으로 저장합니다.
-2. 방금 복사한 `firebaseConfig` 값을 `.env.local`에 채웁니다.
+### 2. Google Gemini API 키 만들기 (사진 속 음식 판별용, 무료)
 
-   ```
-   VITE_FIREBASE_API_KEY=...
-   VITE_FIREBASE_AUTH_DOMAIN=...
-   VITE_FIREBASE_PROJECT_ID=...
-   VITE_FIREBASE_STORAGE_BUCKET=...
-   VITE_FIREBASE_MESSAGING_SENDER_ID=...
-   VITE_FIREBASE_APP_ID=...
-   ```
+1. [Google AI Studio](https://aistudio.google.com/apikey)에 구글 계정으로 로그인 → "Create API key" → 키를 복사해 둡니다. 신용카드 등록 없이 무료로 발급됩니다(무료 사용량 한도 안에서는 비용이 들지 않습니다).
+2. 이 키는 절대 `.env.local`이나 `VITE_`로 시작하는 이름에 넣지 마세요 — 학생 브라우저에 그대로 노출됩니다. 아래 3번 Vercel 설정에만 등록합니다.
 
-3. `src/lib/teacherEmails.ts` 파일을 열어 배열에 **교사로 등록할 구글 이메일**을 넣습니다. 여러 명이면 쉼표로 이어서 추가하면 됩니다.
+### 3. 이 프로젝트를 Vercel에 배포하기 (웹사이트 + 사진 분석 서버)
+
+1. 이 GitHub 저장소를 [Vercel](https://vercel.com)에 새 프로젝트로 가져옵니다(구글/깃허브 계정으로 가입 가능, 카드 등록 불필요). Vite 프로젝트라 별도 설정 없이 자동으로 인식됩니다.
+2. Vercel 프로젝트의 **Settings → Environment Variables**에서 아래 값을 등록합니다.
+
+   | 이름 | 값 | 비고 |
+   |---|---|---|
+   | `VITE_FIREBASE_API_KEY` | 1번 단계에서 복사한 `firebaseConfig.apiKey` | 브라우저에 포함됨(정상) |
+   | `VITE_FIREBASE_AUTH_DOMAIN` | `firebaseConfig.authDomain` | 〃 |
+   | `VITE_FIREBASE_PROJECT_ID` | `firebaseConfig.projectId` | 〃 |
+   | `VITE_FIREBASE_MESSAGING_SENDER_ID` | `firebaseConfig.messagingSenderId` | 〃 |
+   | `VITE_FIREBASE_APP_ID` | `firebaseConfig.appId` | 〃 |
+   | `GEMINI_API_KEY` | 2번 단계에서 만든 Gemini 키 | **`VITE_` 접두사 없이** — 서버에서만 쓰이고 브라우저에는 절대 노출되지 않음 |
+
+3. **Deploy**를 누르면 몇 분 안에 `https://프로젝트이름.vercel.app` 주소로 사이트가 열립니다.
+4. `src/lib/teacherEmails.ts` 파일을 열어 배열에 **교사로 등록할 구글 이메일**을 넣고, GitHub에 커밋·푸시하면 Vercel이 자동으로 다시 배포합니다.
 
    ```ts
    export const TEACHER_EMAILS: string[] = [
@@ -106,32 +119,32 @@ storage.rules                Storage 보안 규칙 (Firebase 콘솔에 붙여넣
    ];
    ```
 
-4. `npm run dev`로 다시 실행하면 로그인 화면이 자동으로 "🔐 Google로 로그인" 버튼으로 바뀝니다.
-
-### 3. 보안 규칙 붙여넣기 (꼭 해야 함)
+### 4. Firestore 보안 규칙 배포하기 (꼭 해야 함)
 
 이 단계를 건너뛰면 아무나 다른 학생의 데이터를 보거나 고칠 수 있습니다.
 
-1. Firebase 콘솔 → Firestore Database → **규칙** 탭 → 이 프로젝트의 [`firestore.rules`](firestore.rules) 파일 내용을 그대로 복사해 붙여넣고 **게시**.
-   - 이때 파일 안의 `teacherEmails()` 목록도 `src/lib/teacherEmails.ts`와 똑같이 바꿔주세요. (교사를 추가/삭제할 때마다 두 파일을 항상 같이 고쳐야 합니다.)
-2. Firebase 콘솔 → Storage → **규칙** 탭 → 이 프로젝트의 [`storage.rules`](storage.rules) 파일 내용을 그대로 붙여넣고 **게시**.
+- Firebase 콘솔 → Firestore Database → **규칙** 탭 → 이 프로젝트의 [`firestore.rules`](firestore.rules) 파일 내용을 그대로 복사해 붙여넣고 **게시**하세요.
+  - 이때 파일 안의 `teacherEmails()` 목록도 `src/lib/teacherEmails.ts`와 똑같이 맞춰주세요. (교사를 추가/삭제할 때마다 두 파일을 항상 같이 고쳐야 합니다.)
+  - Firebase CLI가 이미 로그인되어 있다면 `npx firebase-tools deploy --only firestore:rules --project <프로젝트ID>` 명령으로도 배포할 수 있습니다.
 
-### 4. 확인
+### 5. 확인
 
-1. 브라우저에서 앱을 열고 "Google로 로그인"을 눌러 선생님 이메일로 로그인 → 바로 교사 대시보드로 들어가면 성공입니다. 화면 오른쪽 위에 **학급 코드**(예: `AB12CD`)가 자동으로 생성되어 보입니다 — 이 코드를 학생들에게 알려주세요.
+1. Vercel 배포 주소를 브라우저로 열고 "Google로 로그인"을 눌러 선생님 이메일로 로그인 → 바로 교사 대시보드로 들어가면 성공입니다. 화면 오른쪽 위에 **학급 코드**(예: `AB12CD`)가 자동으로 생성되어 보입니다 — 이 코드를 학생들에게 알려주세요.
 2. 다른 구글 계정(또는 시크릿 창)으로 로그인하면 학급 코드 + 이름/학번을 입력하는 화면이 나옵니다. 방금 확인한 학급 코드를 입력하고 제출하면 그 교사의 학급 학생으로 등록됩니다.
-3. 교사 대시보드에서 방금 로그인한 학생이 목록에 보이는지 확인합니다.
-4. 여러 교사가 있다면, 각 교사는 로그인할 때마다 자기 학급 코드와 자기 학생만 보입니다 — 다른 교사의 학급 코드로 가입한 학생은 보이지 않습니다.
+3. 학생 화면에서 아무 사진이나 올려 제출하면 몇 초 안에 AI가 분석한 결과(성공/실패, 경험치)가 나오는지 확인합니다.
+4. 교사 대시보드 → 학생 상세 화면에서 방금 제출한 기록에 AI가 남긴 음식 설명이 보이는지 확인합니다.
+5. 여러 교사가 있다면, 각 교사는 로그인할 때마다 자기 학급 코드와 자기 학생만 보입니다.
 
-배포(다른 사람도 인터넷 주소로 접속하게 하기)는 Firebase Hosting, Vercel, Netlify 등에 `npm run build`로 만든 `dist` 폴더를 올리면 됩니다. 이 부분은 요청하시면 이어서 도와드릴게요.
+> 로컬 컴퓨터에서 실제 모드(Google 로그인 + AI 분석)까지 전부 테스트하려면 `npm run dev` 대신 `npx vercel dev`로 실행해야 `/api/analyze-food`가 동작합니다. 그냥 `npm run dev`만 쓰면 로그인·대시보드는 되지만 사진 제출 시 분석 요청이 실패합니다 — 그런 경우엔 그냥 Vercel에 배포한 뒤 확인하는 편이 간단합니다.
 
 대안으로 **Supabase**(PostgreSQL 기반)도 가능합니다. 데이터를 SQL 표처럼 다루고 싶거나 Row Level Security로 권한을 SQL 조건문으로 명확히 선언하고 싶다면 더 잘 맞을 수 있지만, 이 프로젝트의 코드는 Firebase 기준으로 맞춰져 있습니다.
 
 ## 보안 체크리스트
 
-- [x] API 키/DB 비밀번호는 `.env.local`에만 두고 커밋하지 않기 (`.gitignore` 확인됨)
-- [x] 서버(Firestore/Storage 보안 규칙)에서 "학생 본인/교사만 접근" 강제하기 — `firestore.rules`, `storage.rules`
-- [x] 업로드 파일 형식/크기 서버에서도 다시 검증하기 — `storage.rules`에서 이미지 형식·15MB 제한 재검증
-- [ ] 배포 시 HTTPS로만 접속되게 하기 (Firebase Hosting/Vercel/Netlify는 기본 제공)
+- [x] API 키/DB 비밀번호는 `.env.local`(로컬)과 Vercel 환경 변수(배포)에만 두고 커밋하지 않기 (`.gitignore` 확인됨)
+- [x] `GEMINI_API_KEY`는 `VITE_` 접두사 없이 서버 전용 환경 변수로 두어 브라우저에 노출되지 않게 하기 — `api/analyze-food.js`에서만 사용
+- [x] 서버(Firestore 보안 규칙)에서 "학생 본인/담당 교사만 접근" 강제하기 — `firestore.rules`
+- [x] 사진을 서버에 저장하지 않아서, 저장된 사진이 유출될 위험 자체가 없음
+- [ ] 배포 시 HTTPS로만 접속되게 하기 (Vercel은 기본 제공)
 - [ ] Firestore 콘솔의 자동 백업(예약 내보내기) 기능 켜두기
 - [ ] 교사의 학생 기록 조회 로그 남기기 (지금은 Firestore 기본 접근 로그만 있음, 별도 감사 로그는 추후 필요 시 추가)

@@ -1,4 +1,4 @@
-// Firestore/Storage 기반 데이터 저장 구현.
+// Firestore 기반 데이터 저장 구현 (사진 파일은 저장하지 않습니다).
 //
 // localStore.ts와 함수 이름·입출력을 최대한 맞춰서, store.ts(파사드)가 두 구현
 // 중 하나를 그대로 골라 쓸 수 있게 했습니다. Firestore 구조:
@@ -6,7 +6,7 @@
 //   users/{uid}                                프로필 (role, displayName, teacherId/classCode 등)
 //   users/{studentUid}/petState/current        학생의 펫 상태
 //   users/{studentUid}/dailyProgress/{date}    학생의 날짜별 오늘 기록
-//   users/{studentUid}/submissions/{id}        학생의 인증 사진 기록 (사진은 Storage에 올리고 URL만 저장)
+//   users/{studentUid}/submissions/{id}        학생의 인증 기록 (AI가 사진을 보고 남긴 설명/점수만 저장, 사진 자체는 저장 안 함)
 //   users/{teacherUid}/missionSettings/current 그 교사의 미션 규칙
 //   users/{teacherUid}/specialMissions/{id}    그 교사의 오늘의 미션 후보 목록
 //   classCodes/{code}                          학급 코드 -> 교사 uid 매핑(학생 가입 시 조회)
@@ -14,19 +14,13 @@
 // petState/dailyProgress/submissions 문서에는 teacherId를 함께 저장해 두어서,
 // 보안 규칙이 "그 학생을 담당하는 교사인지"를 추가 조회 없이 바로 확인할 수 있게 했습니다.
 // (firestore.rules 참고)
+//
+// 사진 판정: 학생이 올린 사진은 /api/analyze-food(Vercel 서버리스 함수, Google
+// Gemini 호출)로 보내 그 자리에서 분석만 하고 결과(음식 설명 + 점수)만 저장합니다.
+// Firebase Storage처럼 유료(Blaze) 요금제가 필요한 저장소를 쓰지 않기 위한
+// 설계입니다 — 사진 자체는 어디에도 남지 않습니다.
 
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  orderBy,
-  query,
-  setDoc,
-  where,
-} from "firebase/firestore";
-import { getDownloadURL, ref, uploadString } from "firebase/storage";
+import { collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, setDoc, where } from "firebase/firestore";
 import type {
   DailyProgress,
   DailySpecialMissionState,
@@ -40,10 +34,11 @@ import type {
   SubmitResult,
   User,
 } from "../types";
-import { firestore, firebaseStorage } from "./firebase";
+import { firestore } from "./firebase";
 import { newId, todayStr } from "./id";
 import { pickTodaysMission } from "./dailyMission";
-import { checkHardBonus, judgeDailyMeal, judgeZeroLeftover, scoreImage } from "./judge";
+import { analyzeFoodPhoto } from "./aiVision";
+import { checkHardBonus, judgeDailyMeal, judgeZeroLeftover } from "./judge";
 import { growthStageFromLevel, levelFromExp } from "./pet";
 import { defaultMissionSetting } from "./seed";
 
@@ -248,13 +243,6 @@ async function listSubmissionsForMeal(studentId: string, date: string, mealType:
   return all.filter((s) => s.date === date && s.mealType === mealType);
 }
 
-async function uploadSubmissionImage(studentId: string, id: string, dataUrl: string): Promise<string> {
-  if (!firebaseStorage) throw new Error("Firebase Storage가 설정되지 않았어요.");
-  const storageRef = ref(firebaseStorage, `submissions/${studentId}/${id}.jpg`);
-  await uploadString(storageRef, dataUrl, "data_url");
-  return getDownloadURL(storageRef);
-}
-
 // ---------- 오늘 기록 ----------
 
 export async function getDailyProgress(studentId: string, teacherId: string, date: string): Promise<DailyProgress> {
@@ -283,9 +271,9 @@ export async function submitMeal(input: {
   sourceType: SourceType;
 }): Promise<SubmitResult> {
   const date = todayStr();
-  const scores = scoreImage(input.imageDataUrl);
   const id = newId("sub");
-  const imageUrl = await uploadSubmissionImage(input.studentId, id, input.imageDataUrl);
+  const analysis = await analyzeFoodPhoto(input.imageDataUrl);
+  const scores = { vegetable: analysis.vegetable, protein: analysis.protein, leftover: analysis.leftover };
 
   const submission: MealSubmission = {
     id,
@@ -294,7 +282,7 @@ export async function submitMeal(input: {
     date,
     mealType: input.mealType,
     phase: input.phase,
-    imageDataUrl: imageUrl,
+    foodDescription: analysis.foodDescription,
     sourceType: input.sourceType,
     scores,
     createdAt: new Date().toISOString(),

@@ -80,7 +80,7 @@ export interface MealSubmission {
   date: string; // YYYY-MM-DD
   mealType: MealType;
   phase: Phase;
-  imageDataUrl: string;
+  foodDescription: string; // AI가 사진을 보고 설명한 음식 내용 — 사진 자체는 저장하지 않음
   sourceType: SourceType;
   scores: {
     vegetable?: number;

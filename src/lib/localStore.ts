@@ -391,7 +391,7 @@ export async function submitMeal(input: {
   sourceType: SourceType;
 }): Promise<SubmitResult> {
   const date = todayStr();
-  const scores = scoreImage(input.imageDataUrl);
+  const scores = scoreImage(input.imageDataUrl); // 데모 모드 임시 시뮬레이션(실제 서비스 모드는 Gemini 분석 사용)
 
   const submission: MealSubmission = {
     id: newId("sub"),
@@ -400,7 +400,7 @@ export async function submitMeal(input: {
     date,
     mealType: input.mealType,
     phase: input.phase,
-    imageDataUrl: input.imageDataUrl,
+    foodDescription: "데모 모드 임시 판정 (실제 사진 분석 아님)",
     sourceType: input.sourceType,
     scores,
     createdAt: new Date().toISOString(),
@@ -583,8 +583,7 @@ export async function ensureSeedData(): Promise<void> {
       date: d.days[d.days.length - 1].date,
       mealType: "breakfast",
       phase: "after",
-      imageDataUrl:
-        "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'></svg>",
+      foodDescription: "예시 기록: 밥, 시금치나물, 계란말이",
       sourceType: "gallery",
       scores: { vegetable: 70, protein: 65, leftover: 20 },
       createdAt: new Date().toISOString(),

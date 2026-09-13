@@ -92,18 +92,18 @@ export function StudentDetail({
       </div>
 
       <div className="card">
-        <h3 style={{ margin: "0 0 10px", fontSize: 15 }}>제출된 사진 ({submissions.length}건)</h3>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {submissions.slice(0, 12).map((s) => (
-            <img
-              key={s.id}
-              src={s.imageDataUrl}
-              alt={`${s.date} ${MEAL_LABEL[s.mealType]} ${s.phase}`}
-              title={`${s.date} · ${MEAL_LABEL[s.mealType]} · ${s.phase === "before" ? "식사 전" : "식사 후"}`}
-              style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, border: "1px solid var(--line)" }}
-            />
+        <h3 style={{ margin: "0 0 10px", fontSize: 15 }}>AI가 확인한 음식 ({submissions.length}건)</h3>
+        <p className="hint" style={{ marginTop: 0 }}>사진 자체는 저장하지 않고, AI가 분석한 설명만 기록돼요.</p>
+        <div className="stack" style={{ gap: 8 }}>
+          {submissions.slice(0, 20).map((s) => (
+            <div key={s.id} className="meal-row">
+              <span className="meal-label">
+                {MEAL_EMOJI[s.mealType]} {s.date} · {MEAL_LABEL[s.mealType]} · {s.phase === "before" ? "식사 전" : "식사 후"}
+              </span>
+              <span style={{ fontSize: 13, color: "var(--ink-dim)", textAlign: "right" }}>{s.foodDescription}</span>
+            </div>
           ))}
-          {submissions.length === 0 && <p style={{ color: "var(--ink-faint)", fontSize: 13.5 }}>아직 사진이 없어요.</p>}
+          {submissions.length === 0 && <p style={{ color: "var(--ink-faint)", fontSize: 13.5 }}>아직 제출 기록이 없어요.</p>}
         </div>
       </div>
     </div>
