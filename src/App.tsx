@@ -39,7 +39,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <span className="logo">🐾</span> 밥친구
+          <span className="logo">🐾</span> 마이푸드펫다이어리
         </div>
         <div className="user-chip">
           <span className={`role-pill ${user.role}`}>{user.role === "student" ? "학생" : "교사"}</span>
