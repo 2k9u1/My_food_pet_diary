@@ -4,22 +4,33 @@ import { getPetState, getUser, listDailyProgress, listSubmissions } from "../../
 import { MEAL_EMOJI, MEAL_LABEL, MEAL_ORDER } from "../../lib/labels";
 import { stageEmoji } from "../../lib/pet";
 
-export function StudentDetail({ studentId, onBack }: { studentId: string; onBack: () => void }) {
+export function StudentDetail({
+  studentId,
+  teacherId,
+  onBack,
+}: {
+  studentId: string;
+  teacherId: string;
+  onBack: () => void;
+}) {
   const [user, setUser] = useState<User | null>(null);
   const [pet, setPet] = useState<PetState | null>(null);
   const [days, setDays] = useState<DailyProgress[]>([]);
   const [submissions, setSubmissions] = useState<MealSubmission[]>([]);
 
   useEffect(() => {
-    Promise.all([getUser(studentId), getPetState(studentId), listDailyProgress(studentId), listSubmissions(studentId)]).then(
-      ([u, p, d, s]) => {
-        setUser(u ?? null);
-        setPet(p);
-        setDays(d);
-        setSubmissions(s);
-      }
-    );
-  }, [studentId]);
+    Promise.all([
+      getUser(studentId),
+      getPetState(studentId, teacherId),
+      listDailyProgress(studentId),
+      listSubmissions(studentId),
+    ]).then(([u, p, d, s]) => {
+      setUser(u ?? null);
+      setPet(p);
+      setDays(d);
+      setSubmissions(s);
+    });
+  }, [studentId, teacherId]);
 
   if (!user || !pet) return <p className="page-sub">불러오는 중...</p>;
 

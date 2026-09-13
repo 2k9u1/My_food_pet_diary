@@ -1,27 +1,27 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SpecialMission } from "../../types";
 import { addSpecialMission, deleteSpecialMission, getTodaysSpecialMission, listSpecialMissions, updateSpecialMission } from "../../lib/store";
 
-export function SpecialMissionManager() {
+export function SpecialMissionManager({ teacherId }: { teacherId: string }) {
   const [missions, setMissions] = useState<SpecialMission[]>([]);
   const [today, setToday] = useState<SpecialMission | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [bonusExp, setBonusExp] = useState(8);
 
-  async function refresh() {
-    const [list, t] = await Promise.all([listSpecialMissions(), getTodaysSpecialMission()]);
+  const refresh = useCallback(async () => {
+    const [list, t] = await Promise.all([listSpecialMissions(teacherId), getTodaysSpecialMission(teacherId)]);
     setMissions(list);
     setToday(t);
-  }
+  }, [teacherId]);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   async function handleAdd() {
     if (!title.trim()) return;
-    await addSpecialMission({ title: title.trim(), description: description.trim(), bonusExp });
+    await addSpecialMission(teacherId, { title: title.trim(), description: description.trim(), bonusExp });
     setTitle("");
     setDescription("");
     setBonusExp(8);
@@ -86,7 +86,7 @@ export function SpecialMissionManager() {
                       type="checkbox"
                       checked={m.active}
                       onChange={async (e) => {
-                        await updateSpecialMission(m.id, { active: e.target.checked });
+                        await updateSpecialMission(teacherId, m.id, { active: e.target.checked });
                         await refresh();
                       }}
                     />
@@ -96,7 +96,7 @@ export function SpecialMissionManager() {
                     className="btn"
                     style={{ padding: "5px 10px", fontSize: 12.5 }}
                     onClick={async () => {
-                      await deleteSpecialMission(m.id);
+                      await deleteSpecialMission(teacherId, m.id);
                       await refresh();
                     }}
                   >

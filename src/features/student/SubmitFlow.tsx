@@ -11,10 +11,12 @@ const PHASES: Array<{ value: Phase; label: string; emoji: string }> = [
 
 export function SubmitFlow({
   studentId,
+  teacherId,
   onDone,
   onCancel,
 }: {
   studentId: string;
+  teacherId: string;
   onDone: (result: SubmitResult) => void;
   onCancel: () => void;
 }) {
@@ -48,6 +50,7 @@ export function SubmitFlow({
     try {
       const result = await submitMeal({
         studentId,
+        teacherId,
         mealType,
         phase,
         imageDataUrl: preview,

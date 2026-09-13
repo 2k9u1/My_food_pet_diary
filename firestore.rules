@@ -1,0 +1,94 @@
+rules_version = '2';
+
+// Firestore 보안 규칙 — "학생은 자기 것만, 교사는 자기 학급 학생만 조회"를
+// 서버(Firebase)가 강제합니다. 화면 코드를 우회해서 직접 요청을 보내도 이
+// 규칙을 통과하지 못하면 거부됩니다. 여러 교사가 각자 학급을 운영할 수 있도록
+// 설계되어 있습니다(학급 코드로 학생이 자기 교사를 선택).
+//
+// 적용 방법: Firebase 콘솔 > Firestore Database > 규칙 탭에 이 파일 내용을
+// 그대로 붙여넣고 "게시"를 누르세요. (또는 Firebase CLI: firebase deploy --only firestore:rules)
+//
+// 중요: 아래 TEACHER_EMAILS 목록은 src/lib/teacherEmails.ts 와 반드시 똑같이
+// 맞춰주세요. 한쪽만 고치면 화면에 보이는 역할과 실제 서버 권한이 어긋납니다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function teacherEmails() {
+      return [
+        'padsa15@gmail.com' // src/lib/teacherEmails.ts 의 TEACHER_EMAILS와 동일하게 유지
+      ];
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacher() {
+      return isSignedIn() && request.auth.token.email.lower() in teacherEmails();
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // 이 학생 문서(users/{uid})가 "나"(로그인한 교사)의 학급 학생인지
+    function isMyStudentDoc() {
+      return isTeacher() && resource.data.teacherId == request.auth.uid;
+    }
+
+    // petState/dailyProgress/submissions 문서에 함께 저장해 둔 teacherId로,
+    // 추가 조회 없이 "내 학급 학생의 데이터인지"를 확인합니다.
+    function isMyStudentData() {
+      return isTeacher() && resource.data.teacherId == request.auth.uid;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isMyStudentDoc();
+      // 생성 시점에만 role을 정할 수 있고, teacher로는 teacherEmails()에 있는
+      // 사람만 자기 문서를 만들 수 있습니다 — 학생이 임의로 교사 행세를 못 합니다.
+      allow create: if isOwner(uid) &&
+        ((request.resource.data.role == 'teacher' && isTeacher()) ||
+         (request.resource.data.role == 'student' && !isTeacher()));
+      // 이후 수정은 본인만, role은 바꿀 수 없습니다.
+      allow update: if isOwner(uid) && request.resource.data.role == resource.data.role;
+      allow delete: if false;
+
+      match /petState/{docId} {
+        allow read: if isOwner(uid) || isMyStudentData();
+        allow write: if isOwner(uid);
+      }
+
+      match /dailyProgress/{docId} {
+        allow read: if isOwner(uid) || isMyStudentData();
+        allow write: if isOwner(uid);
+      }
+
+      match /submissions/{docId} {
+        allow read: if isOwner(uid) || isMyStudentData();
+        allow create: if isOwner(uid);
+        allow update, delete: if false; // 제출 기록은 나중에 고치거나 지울 수 없음(판정 신뢰성)
+      }
+
+      // 미션 규칙 · 오늘의 미션 후보 목록: 그 교사(uid) 본인과, teacherId가 uid인
+      // 학생만 읽을 수 있고, 고치는 것은 교사 본인만 할 수 있습니다.
+      match /missionSettings/{docId} {
+        allow read: if isOwner(uid) ||
+          (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teacherId == uid);
+        allow write: if isOwner(uid) && isTeacher();
+      }
+
+      match /specialMissions/{docId} {
+        allow read: if isOwner(uid) ||
+          (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teacherId == uid);
+        allow write: if isOwner(uid) && isTeacher();
+      }
+    }
+
+    // 학급 코드 -> 교사 uid. 학생이 가입할 때 코드를 조회해야 하므로 로그인한
+    // 사람 누구나 읽을 수 있고, 교사 본인만 자기 코드를 등록할 수 있습니다.
+    match /classCodes/{code} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isTeacher() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

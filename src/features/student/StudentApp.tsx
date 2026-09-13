@@ -15,20 +15,27 @@ export function StudentApp({ user }: { user: User }) {
   const [specialMission, setSpecialMission] = useState<SpecialMission | null>(null);
   const [lastResult, setLastResult] = useState<SubmitResult | null>(null);
 
+  const teacherId = user.teacherId;
+
   const refresh = useCallback(async () => {
+    if (!teacherId) return;
     const [p, d, sm] = await Promise.all([
-      getPetState(user.id),
-      getDailyProgress(user.id, todayStr()),
-      getTodaysSpecialMission(),
+      getPetState(user.id, teacherId),
+      getDailyProgress(user.id, teacherId, todayStr()),
+      getTodaysSpecialMission(teacherId),
     ]);
     setPet(p);
     setProgress(d);
     setSpecialMission(sm);
-  }, [user.id]);
+  }, [user.id, teacherId]);
 
   useEffect(() => {
     refresh().then(() => setScreen("today"));
   }, [refresh]);
+
+  if (!teacherId) {
+    return <p className="page-sub">담당 교사 정보를 찾을 수 없어요. 선생님께 문의해 주세요.</p>;
+  }
 
   if (screen === "loading" || !pet || !progress) {
     return <p className="page-sub">불러오는 중...</p>;
@@ -38,6 +45,7 @@ export function StudentApp({ user }: { user: User }) {
     return (
       <SubmitFlow
         studentId={user.id}
+        teacherId={teacherId}
         onCancel={() => setScreen("today")}
         onDone={async (result) => {
           setLastResult(result);
@@ -67,7 +75,7 @@ export function StudentApp({ user }: { user: User }) {
       specialMission={specialMission}
       onStart={() => setScreen("submit")}
       onCompleteSpecial={async () => {
-        await completeSpecialMission(user.id);
+        await completeSpecialMission(user.id, teacherId);
         await refresh();
       }}
     />

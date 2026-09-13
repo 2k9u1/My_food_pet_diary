@@ -8,21 +8,21 @@ import { StudentDetail } from "./StudentDetail";
 
 type Tab = "home" | "settings" | "specialMissions";
 
-export function TeacherApp({ user: _user }: { user: User }) {
+export function TeacherApp({ user }: { user: User }) {
   const [tab, setTab] = useState<Tab>("home");
   const [summaries, setSummaries] = useState<StudentSummary[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
-    listAllStudentsSummary().then(setSummaries);
-  }, []);
+    listAllStudentsSummary(user.id).then(setSummaries);
+  }, [user.id]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   if (selectedStudent) {
-    return <StudentDetail studentId={selectedStudent} onBack={() => setSelectedStudent(null)} />;
+    return <StudentDetail studentId={selectedStudent} teacherId={user.id} onBack={() => setSelectedStudent(null)} />;
   }
 
   return (
@@ -48,8 +48,8 @@ export function TeacherApp({ user: _user }: { user: User }) {
           }}
         />
       )}
-      {tab === "settings" && <RuleSettings />}
-      {tab === "specialMissions" && <SpecialMissionManager />}
+      {tab === "settings" && <RuleSettings teacherId={user.id} />}
+      {tab === "specialMissions" && <SpecialMissionManager teacherId={user.id} />}
     </div>
   );
 }

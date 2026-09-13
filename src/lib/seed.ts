@@ -3,10 +3,10 @@ import { newId } from "./id";
 
 export const DEFAULT_TEACHER_ID = "teacher_default";
 
-export function defaultMissionSetting(): MissionSetting {
+export function defaultMissionSetting(teacherId: string = DEFAULT_TEACHER_ID): MissionSetting {
   return {
     id: "setting_v1",
-    teacherId: DEFAULT_TEACHER_ID,
+    teacherId,
     version: 1,
     active: true,
     updatedAt: new Date().toISOString(),
@@ -37,10 +37,11 @@ const DEFAULT_SPECIAL_MISSION_DRAFTS: Array<Pick<SpecialMission, "title" | "desc
   { title: "물 많이 마시기", description: "오늘 하루 물을 충분히 마시기(음료수 말고 물로!)", bonusExp: 6 },
 ];
 
-export function defaultSpecialMissions(): SpecialMission[] {
+export function defaultSpecialMissions(teacherId: string): SpecialMission[] {
   const now = new Date().toISOString();
   return DEFAULT_SPECIAL_MISSION_DRAFTS.map((draft) => ({
     id: newId("mission"),
+    teacherId,
     ...draft,
     active: true,
     createdAt: now,

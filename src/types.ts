@@ -11,6 +11,8 @@ export interface User {
   useAlias: boolean; // 이름 대신 번호/별명 표시 여부 (개인정보 최소 수집 옵션)
   createdAt: string;
   isDemo?: boolean; // 대시보드 미리보기용 샘플 학생 여부
+  teacherId?: string; // role이 student일 때: 어느 교사의 학급에 속하는지
+  classCode?: string; // role이 teacher일 때: 학생들에게 알려주는 학급 코드
 }
 
 export type MealType = "breakfast" | "lunch" | "dinner";
@@ -44,6 +46,7 @@ export interface MissionSetting {
 // 오늘의 미션(교사가 등록한 목록에서 매일 자동으로 하나가 무작위로 뽑히는 보너스 미션)
 export interface SpecialMission {
   id: string;
+  teacherId: string; // 이 미션을 등록한 교사 — 그 교사의 학급 학생에게만 보임
   title: string;
   description: string;
   bonusExp: number;
@@ -63,6 +66,7 @@ export interface DailySpecialMissionState {
 
 export interface PetState {
   studentId: string;
+  teacherId: string; // 담당 교사만 조회할 수 있도록 보안 규칙에서 사용
   exp: number;
   level: number;
   growthStage: string;
@@ -72,6 +76,7 @@ export interface PetState {
 export interface MealSubmission {
   id: string;
   studentId: string;
+  teacherId: string; // 담당 교사만 조회할 수 있도록 보안 규칙에서 사용
   date: string; // YYYY-MM-DD
   mealType: MealType;
   phase: Phase;
@@ -96,6 +101,7 @@ export interface MealProgress {
 // "오늘 기록" + MissionResult 판정 상태를 학생/날짜 단위로 모아둔 집계 레코드
 export interface DailyProgress {
   studentId: string;
+  teacherId: string; // 담당 교사만 조회할 수 있도록 보안 규칙에서 사용
   date: string;
   meals: Record<MealType, MealProgress>;
   hardBonusApplied: boolean;

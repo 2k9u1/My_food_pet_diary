@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import type { MissionSetting } from "../../types";
 import { getMissionSetting, saveMissionSetting } from "../../lib/store";
 
-export function RuleSettings() {
+export function RuleSettings({ teacherId }: { teacherId: string }) {
   const [setting, setSetting] = useState<MissionSetting | null>(null);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    getMissionSetting().then(setSetting);
-  }, []);
+    getMissionSetting(teacherId).then(setSetting);
+  }, [teacherId]);
 
   if (!setting) return <p className="page-sub">불러오는 중...</p>;
 
@@ -19,7 +19,7 @@ export function RuleSettings() {
 
   async function handleSave() {
     if (!setting) return;
-    const next = await saveMissionSetting(setting);
+    const next = await saveMissionSetting(teacherId, setting);
     setSetting(next);
     setSaved(true);
   }
