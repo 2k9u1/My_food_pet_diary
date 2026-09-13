@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { Role, User } from "../types";
 import {
   AuthFormError,
@@ -9,6 +9,17 @@ import {
   signInOrUpTeacher,
   usingFirebase,
 } from "../lib/auth";
+import { PolicyModal } from "./PolicyModal";
+
+const linkStyle: CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  font: "inherit",
+  color: "var(--accent)",
+  textDecoration: "underline",
+  cursor: "pointer",
+};
 
 /** 주소창의 ?code=AB12CD 를 읽어옵니다 — 교사가 코드 대신 링크를 공유하면 학생은 이 칸을 아예 안 봐도 됩니다. */
 function codeFromUrl(): string {
@@ -28,15 +39,18 @@ export function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
   const [studentNumber, setStudentNumber] = useState("");
   const [classCode, setClassCode] = useState(prefilledCode);
   const [useAlias, setUseAlias] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [openPolicy, setOpenPolicy] = useState<"privacy" | "terms" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const canSubmit =
-    role === "teacher"
+    (role === "teacher"
       ? name.trim().length > 0 && (!usingFirebase || (email.trim().length > 0 && password.length >= 6))
       : name.trim().length > 0 &&
       studentNumber.trim().length > 0 &&
-      (!usingFirebase || (classCode.trim().length > 0 && password.length >= 6));
+      (!usingFirebase || (classCode.trim().length > 0 && password.length >= 6))) &&
+    (!usingFirebase || consent);
 
   async function handleSubmit() {
     if (!canSubmit || busy) return;
@@ -145,11 +159,30 @@ export function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
           </div>
         )}
 
+        {usingFirebase && (
+          <label className="checkbox-row" style={{ alignItems: "flex-start" }}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 2 }} />
+            <span>
+              <button type="button" onClick={() => setOpenPolicy("privacy")} style={linkStyle}>
+                개인정보 처리방침
+              </button>
+              {" "}및{" "}
+              <button type="button" onClick={() => setOpenPolicy("terms")} style={linkStyle}>
+                이용약관
+              </button>
+              에 동의해요.
+              {role === "student" && " (보호자의 동의도 받았어요.)"}
+            </span>
+          </label>
+        )}
+
         {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
 
         <button className="btn btn-primary btn-block" disabled={!canSubmit || busy} onClick={handleSubmit}>
           {busy ? "확인 중..." : "시작하기"}
         </button>
+
+        <PolicyModal kind={openPolicy} onClose={() => setOpenPolicy(null)} />
 
         {!usingFirebase && (
           <p className="hint" style={{ textAlign: "center", margin: 0 }}>
