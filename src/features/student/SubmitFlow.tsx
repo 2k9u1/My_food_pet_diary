@@ -57,7 +57,8 @@ export function SubmitFlow({
         sourceType,
       });
       onDone(result);
-    } catch {
+    } catch (err) {
+      console.error("[DEBUG submitMeal failed]", err);
       setError("제출에 실패했어요. 다시 시도해 주세요.");
     } finally {
       setBusy(false);
