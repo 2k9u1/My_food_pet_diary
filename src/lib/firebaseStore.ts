@@ -232,14 +232,31 @@ async function savePetState(state: PetState): Promise<void> {
 
 // ---------- 제출 기록 ----------
 
-export async function listSubmissions(studentId: string): Promise<MealSubmission[]> {
-  const q = query(collection(db(), "users", studentId, "submissions"), orderBy("createdAt", "desc"));
+// teacherId로 where 필터를 함께 걸어두는 이유: 보안 규칙이 "이 학생 문서의
+// teacherId가 요청자와 같은지"로 접근을 판단하는데, 필터 없이 이 collection
+// 전체를 그냥 조회(list)하면 Firestore가 "결과에 포함될 수 있는 모든 문서가
+// 규칙을 통과하는지"를 미리 증명할 수 없어 조회 자체를 거부합니다. 쿼리에
+// teacherId 필터를 넣어주면 Firestore가 그 필터값과 규칙을 맞춰볼 수 있어
+// 정상적으로 허용됩니다. (학생 본인이 조회할 때는 isOwner 조건만으로 이미
+// 허용되므로 이 필터는 교사가 조회할 때 의미가 있습니다.)
+
+export async function listSubmissions(studentId: string, teacherId: string): Promise<MealSubmission[]> {
+  const q = query(
+    collection(db(), "users", studentId, "submissions"),
+    where("teacherId", "==", teacherId),
+    orderBy("createdAt", "desc")
+  );
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data() as MealSubmission);
 }
 
-async function listSubmissionsForMeal(studentId: string, date: string, mealType: MealType): Promise<MealSubmission[]> {
-  const all = await listSubmissions(studentId);
+async function listSubmissionsForMeal(
+  studentId: string,
+  teacherId: string,
+  date: string,
+  mealType: MealType
+): Promise<MealSubmission[]> {
+  const all = await listSubmissions(studentId, teacherId);
   return all.filter((s) => s.date === date && s.mealType === mealType);
 }
 
@@ -250,8 +267,12 @@ export async function getDailyProgress(studentId: string, teacherId: string, dat
   return snap.exists() ? (snap.data() as DailyProgress) : emptyDailyProgress(studentId, teacherId, date);
 }
 
-export async function listDailyProgress(studentId: string): Promise<DailyProgress[]> {
-  const q = query(collection(db(), "users", studentId, "dailyProgress"), orderBy("date", "desc"));
+export async function listDailyProgress(studentId: string, teacherId: string): Promise<DailyProgress[]> {
+  const q = query(
+    collection(db(), "users", studentId, "dailyProgress"),
+    where("teacherId", "==", teacherId),
+    orderBy("date", "desc")
+  );
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data() as DailyProgress);
 }
@@ -299,7 +320,7 @@ export async function submitMeal(input: {
   const dailyMealSuccessNow = judgeDailyMeal(setting, scores) || prevDailyMealSuccess;
   meal.dailyMealSuccess = dailyMealSuccessNow;
 
-  const sameMealSubs = await listSubmissionsForMeal(input.studentId, date, input.mealType);
+  const sameMealSubs = await listSubmissionsForMeal(input.studentId, input.teacherId, date, input.mealType);
   const hasBefore = sameMealSubs.some((s) => s.phase === "before");
   const hasAfter = sameMealSubs.some((s) => s.phase === "after");
   if (hasBefore && hasAfter) {
@@ -353,25 +374,13 @@ export async function submitMeal(input: {
 // ---------- 교사 대시보드 집계 ----------
 
 export async function listAllStudentsSummary(teacherId: string): Promise<StudentSummary[]> {
-  const students = await listStudents(teacherId).catch((e) => {
-    console.error("[DEBUG listStudents]", e);
-    throw e;
-  });
+  const students = await listStudents(teacherId);
   const today = todayStr();
   const results: StudentSummary[] = [];
   for (const user of students) {
-    const petState = await getPetState(user.id, teacherId).catch((e) => {
-      console.error("[DEBUG getPetState]", user.id, e);
-      throw e;
-    });
-    const todayProgress = await getDailyProgress(user.id, teacherId, today).catch((e) => {
-      console.error("[DEBUG getDailyProgress]", user.id, e);
-      throw e;
-    });
-    const history = await listDailyProgress(user.id).catch((e) => {
-      console.error("[DEBUG listDailyProgress]", user.id, e);
-      throw e;
-    });
+    const petState = await getPetState(user.id, teacherId);
+    const todayProgress = await getDailyProgress(user.id, teacherId, today);
+    const history = await listDailyProgress(user.id, teacherId);
     let attempted = 0;
     let succeeded = 0;
     for (const day of history) {
@@ -382,10 +391,7 @@ export async function listAllStudentsSummary(teacherId: string): Promise<Student
         }
       }
     }
-    const submissions = await listSubmissions(user.id).catch((e) => {
-      console.error("[DEBUG listSubmissions]", user.id, e);
-      throw e;
-    });
+    const submissions = await listSubmissions(user.id, teacherId);
     results.push({
       user,
       petState,

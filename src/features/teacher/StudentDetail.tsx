@@ -22,8 +22,8 @@ export function StudentDetail({
     Promise.all([
       getUser(studentId),
       getPetState(studentId, teacherId),
-      listDailyProgress(studentId),
-      listSubmissions(studentId),
+      listDailyProgress(studentId, teacherId),
+      listSubmissions(studentId, teacherId),
     ]).then(([u, p, d, s]) => {
       setUser(u ?? null);
       setPet(p);

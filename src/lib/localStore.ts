@@ -335,11 +335,11 @@ async function savePetState(state: PetState): Promise<void> {
 
 // ---------- 제출 기록 ----------
 
-export async function listSubmissions(studentId: string): Promise<MealSubmission[]> {
+export async function listSubmissions(studentId: string, teacherId?: string): Promise<MealSubmission[]> {
   await wait();
   const all = read<MealSubmission[]>(KEYS.submissions, []);
   return all
-    .filter((s) => s.studentId === studentId)
+    .filter((s) => s.studentId === studentId && (!teacherId || s.teacherId === teacherId))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -366,10 +366,12 @@ export async function getDailyProgress(studentId: string, teacherId: string, dat
   return all.find((d) => d.studentId === studentId && d.date === date) ?? emptyDailyProgress(studentId, teacherId, date);
 }
 
-export async function listDailyProgress(studentId: string): Promise<DailyProgress[]> {
+export async function listDailyProgress(studentId: string, teacherId?: string): Promise<DailyProgress[]> {
   await wait();
   const all = read<DailyProgress[]>(KEYS.dailyProgress, []);
-  return all.filter((d) => d.studentId === studentId).sort((a, b) => b.date.localeCompare(a.date));
+  return all
+    .filter((d) => d.studentId === studentId && (!teacherId || d.teacherId === teacherId))
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 async function saveDailyProgress(progress: DailyProgress): Promise<void> {
